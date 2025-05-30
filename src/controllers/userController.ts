@@ -4,12 +4,12 @@ const jwt = require("jsonwebtoken");
 import mongoose from "mongoose";
 import { HttpError } from "../utils/HttpError";
 const secret_key = process.env.SECRET_KEY;
-import { Request, Response ,NextFunction} from "express";
+import { Request, Response, NextFunction } from "express";
 import constant from "../../constant";
 
 export default {
   /***********User Registration******* */
-  addUser: async (req: Request, res: Response,next:NextFunction) => {
+  addUser: async (req: Request, res: Response, next: NextFunction) => {
     console.log("User Registration scope ----> ");
 
     const { name, email, password, age, gender, scope } = req.body;
@@ -17,13 +17,13 @@ export default {
 
     try {
       if (!name || !email || !password || !scope) {
-        throw new HttpError(400,"All field are required" );    //error handling middleware
+        throw new HttpError(400, "All field are required"); //error handling middleware
       }
       if (email) {
         const existingEmail = await db.user.findOne({ email: email });
 
         if (existingEmail) {
-          throw new HttpError(400, "email already exists" );
+          throw new HttpError(400, "email already exists");
         }
       }
 
@@ -40,33 +40,36 @@ export default {
         try {
           const rollNo = await db.student.findOne({ rollNumber: roll_number });
           if (rollNo) {
-            throw new HttpError(400,"student already exists" );
+            throw new HttpError(400, "student already exists");
           }
           const newUser = await db.user.create({
             name: name,
             email: email,
             password: hashedPassword,
             gender: gender,
-            scope: scope,
+            scope: constant.SCOPE.student,
             age: age,
           });
           console.log(newUser);
 
           await db.student.create({
-            user: newUser._id,
+            user: newUser?._id,
             roll_number: roll_number,
             enrolled_courses: enrolled_courses,
           });
-             return  res.send(200).json({Successs:true, message:" Student user register successfully", });
+          return res.send(200).json({
+            Successs: true,
+            message: " Student user register successfully",
+          });
         } catch (err) {
-          next(err)
+          return next(err);
         }
       }
       if (scope == constant.SCOPE.teacher) {
         console.log("Teacher scope ---->");
         const { department, subjects } = req.body;
         if (!department || !subjects) {
-          throw new HttpError(    400,"department and subjects  are required"  );
+          throw new HttpError(400, "department and subjects  are required");
         }
         try {
           const newUser = await db.user.create({
@@ -74,7 +77,7 @@ export default {
             email: email,
             password: hashedPassword,
             gender: gender,
-            scope: scope,
+            scope: constant.SCOPE.teacher,
             age: age,
           });
 
@@ -83,44 +86,37 @@ export default {
             department: department,
             subjects: subjects,
           });
-             return  res.send(200).json({Successs:true, message:" Teacher user register successfully", });
-        } catch (err:any) {
-          next(err)
+          return res.send(200).json({
+            Successs: true,
+            message: " Teacher user register successfully",
+          });
+        } catch (err: any) {
+          return next(err);
         }
       }
-      // Commit all if successful
-      const newUser = await db.user.create({
-            name: name,
-            email: email,
-            password: hashedPassword,
-            gender: gender,
-            scope: scope,
-            age: age,
-          });
-             return  res.send(200).json({Successs:true, message:" Admin user register successfully", });
-
+     
+      throw new HttpError(400,"User does not belongs to valid scope")
     } catch (err: any) {
       console.log("Error ===", err.message);
-      next(err)
+      return next(err);
     }
   },
-  loginUser: async (req: Request, res: Response,next : NextFunction) => {
+  loginUser: async (req: Request, res: Response, next: NextFunction) => {
     const { email, password } = req.body;
     if (!email || !password) {
       throw new HttpError(400, "All field are required");
-      
     }
     try {
       let existingUser = await db.user.findOne({ email: email });
       //    console.log(existingUser.email)
       if (!existingUser) {
-        throw new HttpError(400, "Invalid user email ",);
+        throw new HttpError(400, "Invalid user email ");
       }
 
       const isValid = bcrypt.compareSync(password, existingUser.password);
 
       if (isValid == false) {
-       throw new HttpError(400, "Invalid user email or password");
+        throw new HttpError(400, "Invalid user email or password");
       } else {
         const token = jwt.sign(
           {
@@ -134,44 +130,46 @@ export default {
         // console.log(existingUser.email)
         // console.log(existingUser._id)
         // res.send("user login")
-        res.status(200).json({ data: { token: token } });
+        return res.status(200).json({ data: { token: token } });
       }
     } catch (error) {
-      next(error)
+      return next(error);
     }
   },
-  userProfile: async (req: Request, res: Response,next:NextFunction) => {
-    console.log("USer Profile ")
+  userProfile: async (req: Request, res: Response, next: NextFunction) => {
+    console.log("USer Profile ");
 
-    const userId=req.user?.userId ;
+    const userId = req.user?.userId;
 
-    const scope=req.user?.scope
-    try{
-    const user=await db.user.findById(userId);
-    let rollDetails;
-    if (scope == constant.SCOPE.student){
-        rollDetails=await db.student.findOne({user: new mongoose.Types.ObjectId(userId) }).populate('user')
-    }
-    if(scope == constant.SCOPE.teacher){
-        rollDetails=await db.teacher.findOne({user: new mongoose.Types.ObjectId(userId) })
-    }
-    res.status(200).json({
+    const scope = req.user?.scope;
+    try {
+      const user = await db.user.findById(userId);
+      let rollDetails;
+      if (scope == constant.SCOPE.student) {
+        rollDetails = await db.student
+          .findOne({ user: new mongoose.Types.ObjectId(userId) })
+          .populate("user");
+      }
+      if (scope == constant.SCOPE.teacher) {
+        rollDetails = await db.teacher.findOne({
+          user: new mongoose.Types.ObjectId(userId),
+        });
+      }
+      res.status(200).json({
         user,
         rollDetails,
-    })
-}
-    catch(err:any){
-        next(err)
+      });
+    } catch (err: any) {
+      next(err);
     }
   },
 
-  getAllUsers: async (req: Request, res: Response,next:NextFunction) => {
-    try{
-    const users=await db.user.find()
-    res.status(200).json({success:true,users:users})
-    }
-    catch(err:any){
-        next(err)
+  getAllUsers: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const users = await db.user.find();
+      res.status(200).json({ success: true, users: users });
+    } catch (err: any) {
+      next(err);
     }
   },
 };

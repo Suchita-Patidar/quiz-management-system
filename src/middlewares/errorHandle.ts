@@ -1,6 +1,6 @@
 // middleware/errorHandler.ts
-import { Request, Response, NextFunction } from 'express';
-import { HttpError } from '../utils/HttpError';
+import { Request, Response, NextFunction } from "express";
+import { HttpError } from "../utils/HttpError";
 
 export const errorHandler = (
   err: HttpError,
@@ -9,12 +9,14 @@ export const errorHandler = (
   _next: NextFunction
 ) => {
   const statusCode = err.status || 500;
-  const message = err.message || 'Internal Server Error';
+  const message = err.message || "Internal Server Error";
 
-  console.error(`[${new Date().toISOString()}] ${req.method} ${req.url} - ${message}`);
+  console.error(
+    `[${new Date().toISOString()}] ${req.method} ${req.url} - ${message}`
+  );
 
   res.status(statusCode).json({
-    status: 'error',
+    status: "error",
     statusCode,
     message,
   });
