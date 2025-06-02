@@ -16,7 +16,7 @@ export default (app: any, router: any) => {
     authRole.authorizeRoles(constant.SCOPE.teacher),
     quizController.get_quizzes
   );
-  app.post(
+  app.get(
     "/quizzes/assign/student/:id",
     auth.authenticate,
     authRole.authorizeRoles(constant.SCOPE.teacher),

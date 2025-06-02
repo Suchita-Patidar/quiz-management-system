@@ -50,18 +50,18 @@ export default {
             scope: constant.SCOPE.student,
             age: age,
           });
-          console.log(newUser);
+          // console.log(newUser);
 
           await db.student.create({
             user: newUser?._id,
             roll_number: roll_number,
             enrolled_courses: enrolled_courses,
           });
-          return res.send(200).json({
+          return res.status(200).json({
             Successs: true,
             message: " Student user register successfully",
           });
-        } catch (err) {
+        } catch (err:any) {
           return next(err);
         }
       }
@@ -86,7 +86,7 @@ export default {
             department: department,
             subjects: subjects,
           });
-          return res.send(200).json({
+          return res.status(200).json({
             Successs: true,
             message: " Teacher user register successfully",
           });
@@ -95,7 +95,7 @@ export default {
         }
       }
      
-      throw new HttpError(400,"User does not belongs to valid scope")
+     return res.status(200).json({message :"user does not belons to valid scope"})
     } catch (err: any) {
       console.log("Error ===", err.message);
       return next(err);

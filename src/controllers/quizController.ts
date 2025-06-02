@@ -3,6 +3,8 @@ import { questionType } from "../models/question";
 import { HttpError } from "../utils/HttpError";
 import db from "../models/index";
 import student from "../models/student";
+import mongoose from 'mongoose';
+import { AnyARecord } from "node:dns";
 export default {
   add_quize: async (req: Request, res: Response, next: NextFunction) => {
     console.log("ADD quize function");
@@ -73,7 +75,10 @@ export default {
     }
   },
   get_quizzes: async (req: Request, res: Response, next: NextFunction) => {
+    console.log("inside get_quizzes function")
+    /*******Every teacher can see all quizzes */
     try {
+
       const quizzes = await db.quiz.find(
         {},
         {
@@ -91,7 +96,9 @@ export default {
           updatedAt: 0,
         }
       );
-
+    if(!quizzes){
+      return res.status(200).json({message:"NO quiz is found "})
+    }
       return res.status(200).json({ quizes: quizzes });
     } catch (error: any) {
       next(error);
@@ -99,29 +106,38 @@ export default {
   },
   assign_quize: async (req: Request, res: Response, next: NextFunction) => {
     console.log("inside assign_quiz ");
+    /*****teacher assign a quiz to a student  */
+    /********teacher use token */
     try {
-      const { studentId } = req.params;
+      const studentId:any  = req.params;
       const teacherId = req.user?.userId;
+   const  studentObId = new mongoose.Types.ObjectId(studentId);
+      
+      // console.log(studentId)
+      // console.log(typeof(studentId))
+      const student = await db.student.findById(studentObId);
+      // console.log(student)
+      if (!student) {
+        throw new HttpError(400, "No student is found");
+      }
 
       // console.log(teacherId)
       const quiz = await db.quiz
         .findOne({ created_by: teacherId })
         .sort({ createdAt: -1 });
+        // console.log(quiz)
       if (!quiz) {
         throw new HttpError(400, "Teacher has no quiz to assign");
       }
-      const student = await db.student.findOne({ studentId });
-      if (!student) {
-        throw new HttpError(400, "No student is found");
-      }
-      if (student?.assigned_quiz) {
+      // console.log(student.assigned_quiz)
+      if (student?.assigned_quiz != null) {
         throw new HttpError(
           400,
           "You have already assigned a quiz pleaze complete that firstly"
         );
       }
       // console.log(student)
-      await db.student.findByIdAndUpdate(studentId, {
+      await db.student.findByIdAndUpdate(studentObId, {
         assigned_quiz: quiz._id,
       });
       return res.status(200).json({
