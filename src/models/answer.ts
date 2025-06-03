@@ -8,5 +8,5 @@ export const answerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const answer = mongoose.model("answer", answerSchema);
-export default answer;
+// const answer = mongoose.model("answer", answerSchema);
+// export default answer

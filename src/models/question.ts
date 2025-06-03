@@ -23,6 +23,8 @@ export const questionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-const question = mongoose.model("question", questionSchema);
 
-export default question;
+
+// const question = mongoose.model("question", questionSchema);
+
+// export default question;

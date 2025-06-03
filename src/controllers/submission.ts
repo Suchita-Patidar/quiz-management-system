@@ -1,32 +1,30 @@
 import { NextFunction, Request, Response } from "express";
 import db from "../models/index";
 import { HttpError } from "../utils/HttpError";
-import student from "../models/student";
-import mongoose from "mongoose";
-// interface StudentType {
-//   assigned_quiz: assigned_quiz; // Add the field here
-//   // other student fields...
-// }
+
 export default {
   get_quiz: async (req: Request, res: Response, next: NextFunction) => {
     try {
       console.log("inside get quize for completing it");
-      const id: any = req.params;
-      const studentId = new mongoose.Types.ObjectId(id);
-      const student = await db.student.findById(studentId);
-      console.log(student);
-      if (!student) {
-        throw new HttpError(400, " Student User not found ");
+     const _id=req.user?.userId
+      const {quizId}:any=req.params
+    
+      if (!quizId) {
+        throw new HttpError(400, "quiz id is required ");
       }
-      const assigned_id = student?.assigned_quiz;
-      console.log(assigned_id);
-      if (!assigned_id) {
-        throw new HttpError(400, "quiz is not assigned to you ");
+
+      const student=await db.student.findOne({user:_id})
+console.log(student?.assigned_quiz)
+   const isQuizAssigned = student?.assigned_quiz.some(id => id.equals(quizId));
+         if(!isQuizAssigned){
+        throw new HttpError(401,"No quiz is assigned to you for this quiz id ")
       }
-      // console.log(assigned_id);
-      const quiz = await db.quiz.findOne(assigned_id, {
+      const quiz = await db.quiz.findOne({_id:quizId}, {
         _id: 0,
-        createdAt: 0,
+        created_by: 0,
+        updatedAt:0,
+        __v:0,
+        createdAt:0,
         "questions.type": 0,
         "questions.createdAt": 0,
         "questions.updatedAt": 0,
@@ -36,6 +34,9 @@ export default {
         "questions.options.createdAt": 0,
         "questions.options.updatedAt": 0,
       });
+      if(!quiz){
+        throw new HttpError(401,"quiz is not  found for this quiz id ")
+      }
 
       res.status(200).json({ message: "QUiz fetch successfully", quiz: quiz });
     } catch (error) {
@@ -48,12 +49,10 @@ export default {
     try {
       const { answer } = req.body;
       let { started_at } = req.body;
-      let { quizId } = req.body;
+      const { quizId } = req.body;
 
-      const studentId: any = req.user?.userId;
-      const studentObjectId = new mongoose.Types.ObjectId(studentId);
-      //  console.log(studentObjectId,quizId)
-
+      const userId: any = req.user?.userId;
+    
       if (!answer || !started_at || !quizId) {
         throw new HttpError(
           400,
@@ -66,21 +65,17 @@ export default {
           "Answer  array are required to submiting quiz"
         );
       }
-      quizId = new mongoose.Types.ObjectId(quizId);
+     
       started_at = new Date(started_at);
 
-      if (
-        !mongoose.Types.ObjectId.isValid(studentObjectId) ||
-        !mongoose.Types.ObjectId.isValid(quizId)
-      ) {
-        return res.status(400).json({ message: "Invalid studentId or quizId" });
-      }
+   
 
-      const student = await db.student.findOne({ user: studentObjectId });
+      const student = await db.student.findOne({ user:req.user?.userId });
       // console.log(student)
       // console.log(student?.assigned_quiz)
       // console.log(quizId)
-      if (student?.assigned_quiz.toString() !== quizId.toString()) {
+      const isAssigned=student?.assigned_quiz.some(id => id.equals(quizId))
+      if (!isAssigned) {
         throw new HttpError(
           401,
           "user does not assigned this quiz ,you are submitting wrong quiz"
@@ -88,7 +83,7 @@ export default {
       }
 
       const existingSubmission = await db.submission.find({
-        student: studentObjectId,
+        student: userId,
         quiz: quizId,
       });
 
@@ -104,7 +99,7 @@ export default {
       let durationMs = submission_time.getTime() - started_at.getTime();
       let duration = durationMs / (1000 * 60); //in minutes
 
-      const assignQuiz = await db.quiz.findOne(quizId);
+      const assignQuiz = await db.quiz.findOne({quiz:quizId});
       const quizDuration = assignQuiz?.duration || 10;
 
       if (quizDuration < duration) {
@@ -119,7 +114,7 @@ export default {
       if (answer.length == 0) {
         marks = 0;
         const submit = await db.submission.create({
-          student: studentObjectId,
+          student: userId,
           quiz: quizId,
           answer: [],
           score: marks,
@@ -136,18 +131,18 @@ export default {
       for (let i = 0; i < answer.length; i++) {
         let ans = answer[i];
 
-        if (!ans.question_no) {
-          throw new HttpError(400, "question number is required");
+        if (!ans._id) {
+          throw new HttpError(400, "question id is required");
         }
 
         if (ans.submitted_answer) {
           // Find the matching question by question_no
           const question = quiz_question.find(
-            (q: any) => q.question_no == ans.question_no
+            (q: any) => q._id == ans._id
           );
 
           if (!question) {
-            throw new HttpError(404, `Question ${ans.question_no} not found`);
+            throw new HttpError(404, `Question ${ans._id} not found`);
           }
 
           const assign_marks = question.marks;
@@ -164,7 +159,7 @@ export default {
 
       // console.log(marks)
       const submission = await db.submission.create({
-        student: studentObjectId,
+        student: userId,
         quiz: quizId,
         answer: answer,
         score: marks,
@@ -183,25 +178,24 @@ export default {
   result_quiz: async (req: Request, res: Response, next: NextFunction) => {
     console.log("INside result_quiz function  ........");
     try {
-      const { quizId } = req.body;
-      const studentId: any = req.user?.userId;
+      const { quizId } = req.params;
+      const userId: any = req.user?.userId;
 
-      const studentObjectId = new mongoose.Types.ObjectId(studentId);
-      const quizObjectId = new mongoose.Types.ObjectId(quizId);
+    
       const quiz = await db.quiz.findById(quizId);
       if (!quiz) {
         throw new HttpError(400, "oops! you give wrong Quiz id");
       }
       const quizTitle = quiz.title;
       const submission = await db.submission.find({
-        student: studentObjectId,
-        quiz: quizObjectId,
+        student: userId,
+        quiz: quizId,
       });
       console.log(submission)
       if (submission.length == 0) {
         throw new HttpError(
           400,
-          `you do not submit quiz with student Id ${studentId} and quiz Id ${quizId}`
+          `you do not submit quiz with student Id ${userId} and quiz Id ${quizId}`
         );
       }
       // console.log(submission.score);
@@ -213,4 +207,48 @@ export default {
       next(error);
     }
   },
-};
+  get_allQuiz:async(req:Request,res:Response,next:NextFunction)=>{
+    try{
+         console.log("INside get all quiz function ")
+         const student =await db.student.findOne({user:req.user?.userId}) 
+         const assigned_quiz=student?.assigned_quiz||[]
+         if(assigned_quiz?.length >0){
+
+      const assignedQuizDetails = [];
+
+for (const id of assigned_quiz) {
+  try {
+    const quiz = await db.quiz.findById(id,
+      { 
+        updatedAt:0,
+        __v:0,
+        createdAt:0,
+        "questions.type": 0,
+        "questions.createdAt": 0,
+        "questions.updatedAt": 0,
+        "questions.options.isCorrect": 0,
+        "questions.options._id": 0,
+        "questions.options.createdAt": 0,
+        "questions.options.updatedAt": 0,
+      }
+    );
+    if (quiz) {
+      assignedQuizDetails.push(quiz);
+    }
+  } catch (error) {
+   throw  new HttpError(400,`Error fetching quiz with ID ${id}:`);
+  }
+}
+
+
+          return res.status(200).json({asigned_quiz_id :assignedQuizDetails})
+         }
+         throw new HttpError(400," No any quiz is not assigned to you ")
+
+
+    }
+    catch(error:any){
+      next(error)
+  }
+}
+}

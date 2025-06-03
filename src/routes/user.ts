@@ -18,7 +18,6 @@ export default (app: any, router: any) => {
   app.get(
     "/users",
     auth.authenticate,
-    authRole.authorizeRoles(constant.SCOPE.admin),
     userController.getAllUsers
   );
 };

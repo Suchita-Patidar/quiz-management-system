@@ -32,15 +32,24 @@ export default {
       if (scope == constant.SCOPE.student) {
         console.log("Student scope --->");
         const { roll_number, enrolled_courses } = req.body;
-        console.log(roll_number, enrolled_courses);
+       
+
         if (!roll_number || !enrolled_courses) {
           throw new HttpError(400, "Roll number and  coures are required");
         }
+ 
+     const validCourses = await db.course.find({ _id: { $in: enrolled_courses } });
+
+    if (validCourses.length !== enrolled_courses.length) {
+      throw new HttpError(
+      400 ,'One or more enrolled courses IDs are invalid'
+      );
+    }
 
         try {
-          const rollNo = await db.student.findOne({ rollNumber: roll_number });
+          const rollNo = await db.student.findOne({ roll_number: roll_number });
           if (rollNo) {
-            throw new HttpError(400, "student already exists");
+            throw new HttpError(400, "student with this roll_no already exists ,change roll number");
           }
           const newUser = await db.user.create({
             name: name,
@@ -71,6 +80,14 @@ export default {
         if (!department || !subjects) {
           throw new HttpError(400, "department and subjects  are required");
         }
+
+           const validSubject = await db.subject.find({ _id: { $in: subjects } });
+
+    if (validSubject.length !== subjects.length) {
+      throw new HttpError(
+      400 ,'One or more subject IDs are invalid'
+      );
+    }
         try {
           const newUser = await db.user.create({
             name: name,
@@ -94,7 +111,7 @@ export default {
           return next(err);
         }
       }
-     
+        
      return res.status(200).json({message :"user does not belons to valid scope"})
     } catch (err: any) {
       console.log("Error ===", err.message);
@@ -143,17 +160,27 @@ export default {
 
     const scope = req.user?.scope;
     try {
-      const user = await db.user.findById(userId);
+      const user = await db.user.findById(userId, '-password -createdAt -updatedAt -_id -__v' );
       let rollDetails;
       if (scope == constant.SCOPE.student) {
         rollDetails = await db.student
-          .findOne({ user: new mongoose.Types.ObjectId(userId) })
-          .populate("user");
+          .findOne({ user: new mongoose.Types.ObjectId(userId) },{
+            _id:0,
+            "roll_number":1,
+            "enrolled_courses":1
+          })
+          
       }
       if (scope == constant.SCOPE.teacher) {
         rollDetails = await db.teacher.findOne({
-          user: new mongoose.Types.ObjectId(userId),
-        });
+          
+        },{
+          _id:0,
+          "department":1,
+          "subjects":1
+        }
+      );
+        
       }
       res.status(200).json({
         user,
@@ -166,7 +193,25 @@ export default {
 
   getAllUsers: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const users = await db.user.find();
+
+
+      const scope=req.user?.scope;
+
+      if(scope == constant.SCOPE.student){
+
+              const users = await db.user.find({scope:constant.SCOPE.student}, '-password -createdAt -updatedAt  -__v');
+                return res.status(200).json({success: true,users:users})
+      }
+
+      else if(scope == constant.SCOPE.teacher){
+              const users = await db.user.find({scope:constant.SCOPE.student}, '-password -createdAt -updatedAt  -__v');
+               return res.status(200).json({success:true,users:users})      
+      }
+
+
+
+
+      const users = await db.user.find({}, '-password -createdAt -updatedAt  -__v');
       res.status(200).json({ success: true, users: users });
     } catch (err: any) {
       next(err);

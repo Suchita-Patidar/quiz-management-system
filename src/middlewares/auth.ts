@@ -22,6 +22,7 @@ export default {
         name: decode.name,
         scope: decode.scope,
       };
+      console.log(decode)
       next();
     } catch (err) {
       return res.status(401).json({ message: "Invalid token." });

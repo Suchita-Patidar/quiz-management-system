@@ -11,7 +11,7 @@ export default {
 
       if (!allowedRoles.includes(user.scope)) {
         return res.status(403).json({
-          message: "Insufficient role,only admin can see user detail ",
+          message: 'Access denied: Your role does not permit access to this resource.'
         });
       }
 

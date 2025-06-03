@@ -80,9 +80,9 @@ export default {
     try {
 
       const quizzes = await db.quiz.find(
-        {},
+        {created_by:req.user?.userId},
         {
-          " _id": 0,
+          _id: 0,
           createdAt: 0,
           "questions.type": 0,
           "questions.createdAt": 0,
@@ -94,6 +94,7 @@ export default {
           "questions.options.updatedAt": 0,
           created_by: 0,
           updatedAt: 0,
+          __v:0
         }
       );
     if(!quizzes){
@@ -105,43 +106,41 @@ export default {
     }
   },
   assign_quize: async (req: Request, res: Response, next: NextFunction) => {
-    console.log("inside assign_quiz ");
+    console.log("Inside assign_quiz ");
     /*****teacher assign a quiz to a student  */
     /********teacher use token */
     try {
-      const studentId:any  = req.params;
+      // const {id}:any  = req.params;
+
+      const quizId= req.body.quiz;
+      const studentId=req.body.studentId;
       const teacherId = req.user?.userId;
-   const  studentObId = new mongoose.Types.ObjectId(studentId);
-      
-      // console.log(studentId)
-      // console.log(typeof(studentId))
-      const student = await db.student.findById(studentObId);
-      // console.log(student)
+ 
+      const student = await db.student.findOne({user:studentId});
+     
       if (!student) {
         throw new HttpError(400, "No student is found");
       }
 
-      // console.log(teacherId)
-      const quiz = await db.quiz
-        .findOne({ created_by: teacherId })
-        .sort({ createdAt: -1 });
-        // console.log(quiz)
-      if (!quiz) {
-        throw new HttpError(400, "Teacher has no quiz to assign");
+     const quiz = await db.quiz.find({ created_by: teacherId ,_id:quizId})
+       if(!quiz){
+     
+     throw new HttpError(400, "Quiz with this quiz id is not found in this teacher scope");
       }
-      // console.log(student.assigned_quiz)
-      if (student?.assigned_quiz != null) {
-        throw new HttpError(
-          400,
-          "You have already assigned a quiz pleaze complete that firstly"
-        );
-      }
-      // console.log(student)
-      await db.student.findByIdAndUpdate(studentObId, {
-        assigned_quiz: quiz._id,
-      });
+
+     const assigned_quiz=student?.assigned_quiz
+           const isAsigned=assigned_quiz.some(id => id.equals(quizId))
+         if(isAsigned){
+          throw new HttpError(400,'This quiz is already assign to this student,give another quiz id to assign quiz ')
+         }
+
+  student.assigned_quiz.push(...quizId);
+    await student.save();
+
+      
+  
       return res.status(200).json({
-        message: `you have a new quiz assign and complete it using ${quiz._id}`,
+        message: `Student ${studentId}  have a new quiz assign  ${quizId}`,
       });
     } catch (error: any) {
       next(error);
